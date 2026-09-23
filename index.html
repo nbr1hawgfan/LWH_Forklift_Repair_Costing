@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forklift Costing &amp; Maintenance Tracker</title>
+<meta name="theme-color" content="#C41230">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root {
+    --brand-red:#C41230; --brand-red-dark:#9E0E27; --brand-black:#1A1A1A; --brand-gold:#D4A017;
+    --bg:#F4F4F5; --surface:#FFFFFF; --surface-2:#F7F7F8; --border:#E2E2E4;
+    --text:#1A1A1A; --text-dim:#5B6572;
+    --success:#157A3D; --danger:#C41230; --warning:#B8860B;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+  .container { max-width:1200px; margin:0 auto; padding:0 20px 3rem; }
+  header {
+    background:linear-gradient(135deg,var(--brand-red),var(--brand-red-dark)); padding:1rem 1.5rem; margin-bottom:1.25rem;
+    display:flex; align-items:center; gap:1rem; border-bottom:3px solid var(--brand-black);
+  }
+  .header-logo { width:44px; height:44px; border-radius:50%; background:#fff; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--brand-red); font-size:1.05rem; }
+  header h1 { margin:0; font-size:1.2rem; color:#fff; text-transform:uppercase; letter-spacing:0.03em; font-weight:800; }
+  header .header-sub { font-size:0.78rem; color:rgba(255,255,255,0.85); text-transform:uppercase; letter-spacing:0.06em; }
+  header nav { margin-left:auto; }
+  header nav a { color:#fff; opacity:0.85; text-decoration:none; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; }
+
+  .card { background:var(--surface); border:1.5px solid var(--brand-gold); border-radius:6px; margin-bottom:1.25rem; padding:1.25rem; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  .card-title { font-weight:800; margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.03em; font-size:0.85rem; color:var(--brand-black); }
+
+  .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.25rem; }
+  .kpi { background:var(--surface); border:1.5px solid var(--border); border-left:4px solid var(--brand-red); border-radius:6px; padding:1rem; }
+  .kpi-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); font-weight:700; margin-bottom:0.3rem; }
+  .kpi-value { font-size:1.6rem; font-weight:800; color:var(--brand-black); }
+
+  input, select { background:var(--surface); border:1.5px solid var(--border); color:var(--text); border-radius:4px; padding:0.5rem 0.7rem; font-size:0.9rem; }
+  input:focus, select:focus { outline:none; border-color:var(--brand-red); }
+  label { display:block; font-size:0.78rem; color:var(--text-dim); margin-bottom:0.25rem; font-weight:600; }
+
+  button.btn { border:none; border-radius:4px; padding:0.6rem 1.1rem; font-size:0.85rem; font-weight:800; cursor:pointer; text-transform:uppercase; letter-spacing:0.03em; }
+  .btn-primary { background:var(--brand-black); color:#fff; }
+  .btn-primary:hover { background:#000; }
+  .btn-secondary { background:var(--surface-2); color:var(--text); border:1.5px solid var(--border); }
+  .btn-danger { background:var(--brand-red); color:#fff; }
+  .btn-sm { padding:0.35rem 0.7rem; font-size:0.75rem; }
+
+  table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  th { text-align:left; text-transform:uppercase; letter-spacing:0.03em; font-size:0.7rem; color:var(--text-dim); border-bottom:2px solid var(--border); padding:0.5rem 0.6rem; cursor:pointer; user-select:none; }
+  th:hover { color:var(--brand-red); }
+  td { padding:0.55rem 0.6rem; border-bottom:1px solid var(--border); }
+  tr:hover td { background:var(--surface-2); }
+
+  .status-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+  .status-dot.overdue { background:var(--danger); }
+  .status-dot.dueSoon { background:var(--warning); }
+  .status-dot.ok { background:var(--success); }
+
+  .filter-row { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:end; margin-bottom:1rem; }
+  .filter-row > div { min-width:150px; }
+
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:#fff; border-radius:6px; padding:1.5rem; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
+  .modal h2 { margin-top:0; font-size:1.05rem; text-transform:uppercase; letter-spacing:0.03em; }
+  .modal .field { margin-bottom:0.9rem; }
+  .modal-actions { display:flex; gap:0.6rem; justify-content:flex-end; margin-top:1.2rem; }
+
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--brand-black); color:#fff; border:1px solid var(--border); padding:0.7rem 1.1rem; border-radius:4px; font-size:0.9rem; display:none; z-index:999; }
+  #toast.error { border-color:var(--danger); background:var(--brand-red-dark); }
+  #toast.show { display:block; }
+
+  .empty-state { text-align:center; padding:2rem; color:var(--text-dim); }
+  .row-actions { display:flex; gap:0.4rem; }
+
+  @media print {
+    header, .no-print, .filter-row, button { display:none !important; }
+    .card { border:1px solid #000; box-shadow:none; }
+    body { background:#fff; }
+  }
+
+  @media (max-width: 720px) {
+    .container { padding:0 10px 2rem; }
+    table, thead, tbody, th, td, tr { display:block; }
+    thead tr { display:none; }
+    td { border:none; padding:0.3rem 0.6rem; }
+    tr { border-bottom:1px solid var(--border); padding:0.5rem 0; }
+    td:before { content:attr(data-label); font-weight:700; display:inline-block; width:110px; color:var(--text-dim); font-size:0.72rem; text-transform:uppercase; }
+  }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<header>
+  <div class="header-logo">LW</div>
+  <div>
+    <h1>Costing &amp; Maintenance Tracker</h1>
+    <div class="header-sub">Logistics Warehouse — Forklift Fleet</div>
+  </div>
+  <nav><a href="#" id="printBtn">Print / Export</a></nav>
+</header>
+
+<div class="container">
+
+  <div class="card" id="loginCard">
+    <div class="card-title">Admin Access</div>
+    <label>Passcode</label>
+    <input type="password" id="passcode" placeholder="Enter passcode" style="max-width:280px;">
+    <button class="btn btn-primary" id="loginBtn" style="margin-top:0.75rem;">Sign In</button>
+  </div>
+
+  <div id="mainSection" style="display:none;">
+
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Total Repair &amp; PM Cost (All Time)</div><div class="kpi-value" id="kpiAllTime">$0</div></div>
+      <div class="kpi"><div class="kpi-label">This Month</div><div class="kpi-value" id="kpiMonth">$0</div></div>
+      <div class="kpi"><div class="kpi-label">Year to Date</div><div class="kpi-value" id="kpiYtd">$0</div></div>
+      <div class="kpi"><div class="kpi-label">Logged Entries</div><div class="kpi-value" id="kpiCount">0</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Fleet PM Status</div>
+      <div class="filter-row no-print">
+        <div>
+          <label>Status</label>
+          <select id="pmStatusFilter">
+            <option value="">All</option>
+            <option value="overdue">Overdue</option>
+            <option value="dueSoon">Due Soon</option>
+            <option value="ok">OK</option>
+          </select>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="fleetTable">
+          <thead><tr>
+            <th data-sort="liftNumber">Lift #</th>
+            <th data-sort="type">Type</th>
+            <th data-sort="lastPmDate">Last PM</th>
+            <th data-sort="lastPmMeter">Last PM Meter</th>
+            <th data-sort="currentReading">Current Reading</th>
+            <th data-sort="hoursUntilPm">PM Status</th>
+          </tr></thead>
+          <tbody id="fleetBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Repair &amp; PM Cost Log</div>
+      <div class="filter-row no-print">
+        <div>
+          <label>Lift #</label>
+          <select id="repairLiftFilter"><option value="">All lifts</option></select>
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="repairCategoryFilter"><option value="">All categories</option></select>
+        </div>
+        <div style="margin-left:auto;">
+          <button class="btn btn-primary" id="addEntryBtn">+ Add Entry</button>
+          <button class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="repairTable">
+          <thead><tr>
+            <th data-sort="date">Date</th>
+            <th data-sort="liftNumber">Lift #</th>
+            <th data-sort="category">Category</th>
+            <th>Description</th>
+            <th data-sort="vendor">Vendor</th>
+            <th data-sort="cost">Cost</th>
+            <th data-sort="loggedBy">Logged By</th>
+            <th class="no-print">Actions</th>
+          </tr></thead>
+          <tbody id="repairBody"></tbody>
+        </table>
+      </div>
+      <div id="repairEmptyState" class="empty-state" style="display:none;">No repair or PM cost entries logged yet.</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-overlay" id="entryModalOverlay">
+  <div class="modal">
+    <h2 id="entryModalTitle">Add Entry</h2>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="entryDate" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Forklift Number</label>
+      <select id="entryLift" style="width:100%;"></select>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select id="entryCategory" style="width:100%;"></select>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" id="entryDescription" placeholder="e.g. Replaced rear tire" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Vendor</label>
+      <input type="text" id="entryVendor" placeholder="e.g. Crown Lift Trucks" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Cost ($)</label>
+      <input type="number" id="entryCost" min="0" step="0.01" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Invoice Number</label>
+      <input type="text" id="entryInvoice" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Logged By</label>
+      <input type="text" id="entryLoggedBy" placeholder="Your name" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <input type="text" id="entryNotes" style="width:100%;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="entryCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="entrySaveBtn">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'PUT_COSTING_APP_DEPLOYMENT_URL_HERE';
+
+let passcode = '';
+let fleetData = [];
+let repairData = [];
+let categories = [];
+let editingId = null;
+let fleetSort = { key: 'hoursUntilPm', dir: 1 };
+let repairSort = { key: 'date', dir: -1 };
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type === 'error' ? ' error' : '');
+  setTimeout(() => t.className = '', 3500);
+}
+
+function fmtMoney(n) {
+  return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+document.getElementById('loginBtn').addEventListener('click', login);
+document.getElementById('passcode').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+function login() {
+  passcode = document.getElementById('passcode').value;
+  if (!passcode) { showToast('Enter a passcode', 'error'); return; }
+  fetch(`${API_URL}?action=bootstrap&passcode=${encodeURIComponent(passcode)}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res.success) { showToast(res.message || 'Invalid passcode', 'error'); return; }
+      fleetData = res.data.fleet;
+      repairData = res.data.repairs;
+      categories = res.data.categories;
+      document.getElementById('loginCard').style.display = 'none';
+      document.getElementById('mainSection').style.display = 'block';
+      populateFilterOptions();
+      renderAll();
+      loadCostSummary();
+    })
+    .catch(() => showToast('Could not reach server', 'error'));
+}
+
+function loadCostSummary() {
+  fetch(`${API_URL}?action=costSummary&passcode=${encodeURIComponent(passcode)}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res.success) return;
+      const d = res.data;
+      document.getElementById('kpiAllTime').textContent = fmtMoney(d.totalAllTime);
+      document.getElementById('kpiMonth').textContent = fmtMoney(d.totalThisMonth);
+      document.getElementById('kpiYtd').textContent = fmtMoney(d.totalYTD);
+      document.getElementById('kpiCount').textContent = d.entryCount;
+    })
+    .catch(() => {});
+}
+
+function populateFilterOptions() {
+  const liftFilter = document.getElementById('repairLiftFilter');
+  const entryLift = document.getElementById('entryLift');
+  const catFilter = document.getElementById('repairCategoryFilter');
+  const entryCat = document.getElementById('entryCategory');
+
+  fleetData.forEach(lift => {
+    liftFilter.appendChild(new Option(lift.liftNumber, lift.liftNumber));
+    entryLift.appendChild(new Option(`${lift.liftNumber} (${lift.type})`, lift.liftNumber));
+  });
+  categories.forEach(c => {
+    catFilter.appendChild(new Option(c, c));
+    entryCat.appendChild(new Option(c, c));
+  });
+}
+
+/* ---------------- Fleet PM table ---------------- */
+
+document.getElementById('pmStatusFilter').addEventListener('change', renderFleet);
+document.querySelectorAll('#fleetTable th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    fleetSort.dir = (fleetSort.key === key) ? -fleetSort.dir : 1;
+    fleetSort.key = key;
+    renderFleet();
+  });
+});
+
+function renderFleet() {
+  const filter = document.getElementById('pmStatusFilter').value;
+  let rows = fleetData.filter(l => !filter || l.pmStatus === filter);
+  rows.sort((a, b) => (a[fleetSort.key] > b[fleetSort.key] ? 1 : -1) * fleetSort.dir);
+
+  const body = document.getElementById('fleetBody');
+  body.innerHTML = '';
+  rows.forEach(lift => {
+    const tr = document.createElement('tr');
+    const statusLabel = lift.pmStatus === 'overdue' ? `${Math.abs(lift.hoursUntilPm)} hrs overdue`
+      : lift.pmStatus === 'dueSoon' ? `${lift.hoursUntilPm} hrs left`
+      : `${lift.hoursUntilPm} hrs left`;
+    tr.innerHTML = `
+      <td data-label="Lift #">${lift.liftNumber}</td>
+      <td data-label="Type">${lift.type}</td>
+      <td data-label="Last PM">${lift.lastPmDate}</td>
+      <td data-label="Last PM Meter">${lift.lastPmMeter}</td>
+      <td data-label="Current Reading">${lift.currentReading}</td>
+      <td data-label="PM Status"><span class="status-dot ${lift.pmStatus}"></span>${statusLabel}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+/* ---------------- Repair log table ---------------- */
+
+document.getElementById('repairLiftFilter').addEventListener('change', renderRepairs);
+document.getElementById('repairCategoryFilter').addEventListener('change', renderRepairs);
+document.querySelectorAll('#repairTable th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    repairSort.dir = (repairSort.key === key) ? -repairSort.dir : 1;
+    repairSort.key = key;
+    renderRepairs();
+  });
+});
+
+function renderRepairs() {
+  const liftFilter = document.getElementById('repairLiftFilter').value;
+  const catFilter = document.getElementById('repairCategoryFilter').value;
+  let rows = repairData.filter(r =>
+    (!liftFilter || String(r.liftNumber) === liftFilter) &&
+    (!catFilter || r.category === catFilter)
+  );
+  rows.sort((a, b) => (a[repairSort.key] > b[repairSort.key] ? 1 : -1) * repairSort.dir);
+
+  const body = document.getElementById('repairBody');
+  body.innerHTML = '';
+  document.getElementById('repairEmptyState').style.display = rows.length ? 'none' : 'block';
+
+  rows.forEach(entry => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Date">${entry.date}</td>
+      <td data-label="Lift #">${entry.liftNumber}</td>
+      <td data-label="Category">${entry.category}</td>
+      <td data-label="Description">${entry.description || ''}</td>
+      <td data-label="Vendor">${entry.vendor || ''}</td>
+      <td data-label="Cost">${fmtMoney(entry.cost)}</td>
+      <td data-label="Logged By">${entry.loggedBy || ''}</td>
+      <td data-label="Actions" class="no-print">
+        <div class="row-actions">
+          <button class="btn btn-secondary btn-sm" data-edit="${entry.id}">Edit</button>
+          <button class="btn btn-danger btn-sm" data-delete="${entry.id}">Delete</button>
+        </div>
+      </td>`;
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEditModal(btn.dataset.edit)));
+  body.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => deleteEntry(btn.dataset.delete)));
+}
+
+function renderAll() {
+  renderFleet();
+  renderRepairs();
+}
+
+/* ---------------- Add / edit entry modal ---------------- */
+
+const modalOverlay = document.getElementById('entryModalOverlay');
+
+document.getElementById('addEntryBtn').addEventListener('click', () => openAddModal());
+document.getElementById('entryCancelBtn').addEventListener('click', closeModal);
+document.getElementById('entrySaveBtn').addEventListener('click', saveEntry);
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('entryModalTitle').textContent = 'Add Entry';
+  document.getElementById('entryDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('entryLift').selectedIndex = 0;
+  document.getElementById('entryCategory').selectedIndex = 0;
+  document.getElementById('entryDescription').value = '';
+  document.getElementById('entryVendor').value = '';
+  document.getElementById('entryCost').value = '';
+  document.getElementById('entryInvoice').value = '';
+  document.getElementById('entryLoggedBy').value = '';
+  document.getElementById('entryNotes').value = '';
+  modalOverlay.classList.add('open');
+}
+
+function openEditModal(id) {
+  const entry = repairData.find(r => String(r.id) === String(id));
+  if (!entry) return;
+  editingId = id;
+  document.getElementById('entryModalTitle').textContent = 'Edit Entry';
+  document.getElementById('entryDate').value = entry.date;
+  document.getElementById('entryLift').value = entry.liftNumber;
+  document.getElementById('entryCategory').value = entry.category;
+  document.getElementById('entryDescription').value = entry.description || '';
+  document.getElementById('entryVendor').value = entry.vendor || '';
+  document.getElementById('entryCost').value = entry.cost;
+  document.getElementById('entryInvoice').value = entry.invoiceNumber || '';
+  document.getElementById('entryLoggedBy').value = entry.loggedBy || '';
+  document.getElementById('entryNotes').value = entry.notes || '';
+  modalOverlay.classList.add('open');
+}
+
+function closeModal() {
+  modalOverlay.classList.remove('open');
+}
+
+function saveEntry() {
+  const payload = {
+    date: document.getElementById('entryDate').value,
+    liftNumber: document.getElementById('entryLift').value,
+    category: document.getElementById('entryCategory').value,
+    description: document.getElementById('entryDescription').value,
+    vendor: document.getElementById('entryVendor').value,
+    cost: document.getElementById('entryCost').value,
+    invoiceNumber: document.getElementById('entryInvoice').value,
+    loggedBy: document.getElementById('entryLoggedBy').value,
+    notes: document.getElementById('entryNotes').value,
+    passcode
+  };
+
+  if (!payload.date || !payload.liftNumber || !payload.category || !payload.cost) {
+    showToast('Date, lift, category, and cost are required', 'error');
+    return;
+  }
+
+  const action = editingId ? 'updateRepair' : 'addRepair';
+  if (editingId) payload.id = editingId;
+
+  document.getElementById('entrySaveBtn').disabled = true;
+  fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, payload }) })
+    .then(r => r.json())
+    .then(res => {
+      document.getElementById('entrySaveBtn').disabled = false;
+      if (res.success) {
+        showToast(editingId ? 'Entry updated' : 'Entry added');
+        closeModal();
+        login(); // simplest reliable refresh of all data + KPIs
+      } else {
+        showToast(res.message || 'Save failed', 'error');
+      }
+    })
+    .catch(() => {
+      document.getElementById('entrySaveBtn').disabled = false;
+      showToast('Could not reach server', 'error');
+    });
+}
+
+function deleteEntry(id) {
+  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteRepair', payload: { id, passcode } }) })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        showToast('Entry deleted');
+        login();
+      } else {
+        showToast(res.message || 'Delete failed', 'error');
+      }
+    })
+    .catch(() => showToast('Could not reach server', 'error'));
+}
+
+/* ---------------- CSV export + print ---------------- */
+
+document.getElementById('printBtn').addEventListener('click', e => { e.preventDefault(); window.print(); });
+
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  const liftFilter = document.getElementById('repairLiftFilter').value;
+  const catFilter = document.getElementById('repairCategoryFilter').value;
+  const rows = repairData.filter(r =>
+    (!liftFilter || String(r.liftNumber) === liftFilter) &&
+    (!catFilter || r.category === catFilter)
+  );
+
+  const headers = ['Date', 'Lift #', 'Category', 'Description', 'Vendor', 'Cost', 'Invoice Number', 'Logged By', 'Notes'];
+  const lines = [headers.join(',')];
+  rows.forEach(r => {
+    lines.push([r.date, r.liftNumber, r.category, r.description, r.vendor, r.cost, r.invoiceNumber, r.loggedBy, r.notes].map(csvEscape).join(','));
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `forklift-repair-costs-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+function csvEscape(val) {
+  const s = String(val ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
