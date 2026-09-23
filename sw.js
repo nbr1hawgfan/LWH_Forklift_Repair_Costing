@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forklift-costing-v1';
+const CACHE_NAME = 'forklift-costing-v2';
 const APP_SHELL = [
   './',
   './index.html',

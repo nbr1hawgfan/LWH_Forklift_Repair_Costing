@@ -76,8 +76,17 @@
 
   @media print {
     header, .no-print, .filter-row, button { display:none !important; }
-    .card { border:1px solid #000; box-shadow:none; }
-    body { background:#fff; }
+    .card { border:1px solid #000; box-shadow:none; padding:0.6rem; margin-bottom:0.5rem; }
+    body { background:#fff; font-size:11px; }
+    .card-title { font-size:0.75rem; margin-bottom:0.5rem; }
+    th, td { padding:0.25rem 0.4rem; font-size:10px; }
+    .kpi-row { grid-template-columns:repeat(4,1fr); gap:0.5rem; margin-bottom:0.5rem; }
+    .kpi { padding:0.5rem; }
+    .kpi-value { font-size:1.05rem; }
+    .kpi-label { font-size:0.6rem; }
+    /* Page 1: PM fleet status. Page 2: repair/cost log. */
+    #fleetPage { page-break-after:always; break-after:page; }
+    #repairCard { page-break-before:avoid; }
   }
 
   @media (max-width: 720px) {
@@ -114,6 +123,7 @@
 
   <div id="mainSection" style="display:none;">
 
+    <div id="fleetPage">
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label">Total Repair &amp; PM Cost (All Time)</div><div class="kpi-value" id="kpiAllTime">$0</div></div>
       <div class="kpi"><div class="kpi-label">This Month</div><div class="kpi-value" id="kpiMonth">$0</div></div>
@@ -133,6 +143,9 @@
             <option value="ok">OK</option>
           </select>
         </div>
+        <div style="margin-left:auto;">
+          <button class="btn btn-secondary" id="emailFleetBtn">Email This View</button>
+        </div>
       </div>
       <div style="overflow-x:auto;">
         <table id="fleetTable">
@@ -148,8 +161,9 @@
         </table>
       </div>
     </div>
+    </div>
 
-    <div class="card">
+    <div class="card" id="repairCard">
       <div class="card-title">Repair &amp; PM Cost Log</div>
       <div class="filter-row no-print">
         <div>
@@ -161,6 +175,7 @@
           <select id="repairCategoryFilter"><option value="">All categories</option></select>
         </div>
         <div style="margin-left:auto;">
+          <button class="btn btn-secondary" id="emailRepairBtn">Email This View</button>
           <button class="btn btn-primary" id="addEntryBtn">+ Add Entry</button>
           <button class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
         </div>
@@ -174,6 +189,8 @@
             <th>Description</th>
             <th data-sort="vendor">Vendor</th>
             <th data-sort="cost">Cost</th>
+            <th data-sort="poNumber">PO #</th>
+            <th data-sort="invoiceNumber">Invoice #</th>
             <th data-sort="loggedBy">Logged By</th>
             <th class="no-print">Actions</th>
           </tr></thead>
@@ -218,6 +235,10 @@
       <input type="text" id="entryInvoice" style="width:100%;">
     </div>
     <div class="field">
+      <label>PO Number</label>
+      <input type="text" id="entryPo" placeholder="e.g. PO-10432" style="width:100%;">
+    </div>
+    <div class="field">
       <label>Logged By</label>
       <input type="text" id="entryLoggedBy" placeholder="Your name" style="width:100%;">
     </div>
@@ -232,8 +253,27 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="emailModalOverlay">
+  <div class="modal">
+    <h2 id="emailModalTitle">Email This View</h2>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-top:-0.5rem;" id="emailModalSubtext"></p>
+    <div class="field">
+      <label>Send To (comma-separated email addresses)</label>
+      <input type="text" id="emailRecipients" placeholder="you@logistics-warehouse.com" style="width:100%;">
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:0.5rem;">
+      <input type="checkbox" id="emailIncludeDistro" style="width:auto;margin:0;">
+      <label style="margin:0;" for="emailIncludeDistro">Also send to the standard distribution list (Tim, Michael, Todd, Rhewitt)</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="emailCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="emailSendBtn">Send Email</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbyWC-zV60SFrh--v91yF0GoY_pgOXAGs2qvdXZUeHeHy9I3Mz2lLOglDZmOiPCIFY3p/exec';
+const API_URL = 'PUT_COSTING_APP_DEPLOYMENT_URL_HERE';
 
 let passcode = '';
 let fleetData = [];
@@ -242,6 +282,9 @@ let categories = [];
 let editingId = null;
 let fleetSort = { key: 'hoursUntilPm', dir: 1 };
 let repairSort = { key: 'date', dir: -1 };
+let currentFleetRows = [];
+let currentRepairRows = [];
+let emailReportType = 'repair';
 
 function showToast(msg, type) {
   const t = document.getElementById('toast');
@@ -322,6 +365,7 @@ function renderFleet() {
   const filter = document.getElementById('pmStatusFilter').value;
   let rows = fleetData.filter(l => !filter || l.pmStatus === filter);
   rows.sort((a, b) => (a[fleetSort.key] > b[fleetSort.key] ? 1 : -1) * fleetSort.dir);
+  currentFleetRows = rows;
 
   const body = document.getElementById('fleetBody');
   body.innerHTML = '';
@@ -362,6 +406,7 @@ function renderRepairs() {
     (!catFilter || r.category === catFilter)
   );
   rows.sort((a, b) => (a[repairSort.key] > b[repairSort.key] ? 1 : -1) * repairSort.dir);
+  currentRepairRows = rows;
 
   const body = document.getElementById('repairBody');
   body.innerHTML = '';
@@ -376,6 +421,8 @@ function renderRepairs() {
       <td data-label="Description">${entry.description || ''}</td>
       <td data-label="Vendor">${entry.vendor || ''}</td>
       <td data-label="Cost">${fmtMoney(entry.cost)}</td>
+      <td data-label="PO #">${entry.poNumber || ''}</td>
+      <td data-label="Invoice #">${entry.invoiceNumber || ''}</td>
       <td data-label="Logged By">${entry.loggedBy || ''}</td>
       <td data-label="Actions" class="no-print">
         <div class="row-actions">
@@ -413,6 +460,7 @@ function openAddModal() {
   document.getElementById('entryVendor').value = '';
   document.getElementById('entryCost').value = '';
   document.getElementById('entryInvoice').value = '';
+  document.getElementById('entryPo').value = '';
   document.getElementById('entryLoggedBy').value = '';
   document.getElementById('entryNotes').value = '';
   modalOverlay.classList.add('open');
@@ -430,6 +478,7 @@ function openEditModal(id) {
   document.getElementById('entryVendor').value = entry.vendor || '';
   document.getElementById('entryCost').value = entry.cost;
   document.getElementById('entryInvoice').value = entry.invoiceNumber || '';
+  document.getElementById('entryPo').value = entry.poNumber || '';
   document.getElementById('entryLoggedBy').value = entry.loggedBy || '';
   document.getElementById('entryNotes').value = entry.notes || '';
   modalOverlay.classList.add('open');
@@ -448,6 +497,7 @@ function saveEntry() {
     vendor: document.getElementById('entryVendor').value,
     cost: document.getElementById('entryCost').value,
     invoiceNumber: document.getElementById('entryInvoice').value,
+    poNumber: document.getElementById('entryPo').value,
     loggedBy: document.getElementById('entryLoggedBy').value,
     notes: document.getElementById('entryNotes').value,
     passcode
@@ -500,17 +550,12 @@ function deleteEntry(id) {
 document.getElementById('printBtn').addEventListener('click', e => { e.preventDefault(); window.print(); });
 
 document.getElementById('exportCsvBtn').addEventListener('click', () => {
-  const liftFilter = document.getElementById('repairLiftFilter').value;
-  const catFilter = document.getElementById('repairCategoryFilter').value;
-  const rows = repairData.filter(r =>
-    (!liftFilter || String(r.liftNumber) === liftFilter) &&
-    (!catFilter || r.category === catFilter)
-  );
+  const rows = currentRepairRows;
 
-  const headers = ['Date', 'Lift #', 'Category', 'Description', 'Vendor', 'Cost', 'Invoice Number', 'Logged By', 'Notes'];
+  const headers = ['Date', 'Lift #', 'Category', 'Description', 'Vendor', 'Cost', 'PO Number', 'Invoice Number', 'Logged By', 'Notes'];
   const lines = [headers.join(',')];
   rows.forEach(r => {
-    lines.push([r.date, r.liftNumber, r.category, r.description, r.vendor, r.cost, r.invoiceNumber, r.loggedBy, r.notes].map(csvEscape).join(','));
+    lines.push([r.date, r.liftNumber, r.category, r.description, r.vendor, r.cost, r.poNumber, r.invoiceNumber, r.loggedBy, r.notes].map(csvEscape).join(','));
   });
 
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -525,6 +570,76 @@ document.getElementById('exportCsvBtn').addEventListener('click', () => {
 function csvEscape(val) {
   const s = String(val ?? '');
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+/* ---------------- Email This View ---------------- */
+
+const emailModalOverlay = document.getElementById('emailModalOverlay');
+
+document.getElementById('emailFleetBtn').addEventListener('click', () => openEmailModal('fleet'));
+document.getElementById('emailRepairBtn').addEventListener('click', () => openEmailModal('repair'));
+document.getElementById('emailCancelBtn').addEventListener('click', () => emailModalOverlay.classList.remove('open'));
+document.getElementById('emailSendBtn').addEventListener('click', sendEmailReport);
+
+function currentFilterSummary(type) {
+  if (type === 'fleet') {
+    const status = document.getElementById('pmStatusFilter').value;
+    return status ? `PM Status = ${status}` : 'All lifts (no filter)';
+  }
+  const lift = document.getElementById('repairLiftFilter').value;
+  const cat = document.getElementById('repairCategoryFilter').value;
+  const parts = [];
+  if (lift) parts.push(`Lift # = ${lift}`);
+  if (cat) parts.push(`Category = ${cat}`);
+  return parts.length ? parts.join(', ') : 'All entries (no filter)';
+}
+
+function openEmailModal(type) {
+  emailReportType = type;
+  const rows = type === 'fleet' ? currentFleetRows : currentRepairRows;
+  document.getElementById('emailModalTitle').textContent = type === 'fleet' ? 'Email Fleet PM Status' : 'Email Repair & Cost Log';
+  document.getElementById('emailModalSubtext').textContent = `Sends exactly what's currently shown: ${rows.length} row${rows.length === 1 ? '' : 's'} (${currentFilterSummary(type)}).`;
+  document.getElementById('emailRecipients').value = '';
+  document.getElementById('emailIncludeDistro').checked = false;
+  emailModalOverlay.classList.add('open');
+}
+
+function sendEmailReport() {
+  const recipients = document.getElementById('emailRecipients').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const includeDistributionList = document.getElementById('emailIncludeDistro').checked;
+
+  if (recipients.length === 0 && !includeDistributionList) {
+    showToast('Enter at least one email address or check the distribution list box', 'error');
+    return;
+  }
+
+  const rows = emailReportType === 'fleet' ? currentFleetRows : currentRepairRows;
+  const payload = {
+    type: emailReportType,
+    recipients,
+    includeDistributionList,
+    rows,
+    filterSummary: currentFilterSummary(emailReportType),
+    passcode
+  };
+
+  document.getElementById('emailSendBtn').disabled = true;
+  fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'emailReport', payload }) })
+    .then(r => r.json())
+    .then(res => {
+      document.getElementById('emailSendBtn').disabled = false;
+      if (res.success) {
+        showToast('Report sent');
+        emailModalOverlay.classList.remove('open');
+      } else {
+        showToast(res.message || 'Failed to send report', 'error');
+      }
+    })
+    .catch(() => {
+      document.getElementById('emailSendBtn').disabled = false;
+      showToast('Could not reach server', 'error');
+    });
 }
 
 if ('serviceWorker' in navigator) {
